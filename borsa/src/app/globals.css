@@ -1,0 +1,83 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html { -webkit-text-size-adjust: 100%; color-scheme: light; }
+html.dark { color-scheme: dark; }
+body {
+  @apply bg-slate-50 text-slate-900 antialiased;
+  font-variant-numeric: tabular-nums;
+  background-image: radial-gradient(1200px 500px at 10% -10%, rgba(37, 99, 235, 0.07), transparent 60%),
+    radial-gradient(900px 400px at 100% 0%, rgba(15, 157, 107, 0.06), transparent 60%);
+  background-attachment: fixed;
+}
+
+@layer components {
+  .card { @apply rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5; }
+  .card-hover { @apply transition hover:-translate-y-0.5 hover:shadow-md; }
+  .h-sec { @apply text-base font-semibold text-slate-900; }
+  .muted { @apply text-slate-500; }
+  .btn { @apply inline-flex min-h-[40px] items-center justify-center gap-1.5 rounded-xl bg-slate-900 px-4 text-sm font-medium text-white shadow-sm transition hover:bg-slate-700 disabled:opacity-50; }
+  .btn-ghost { @apply inline-flex min-h-[40px] items-center justify-center rounded-xl border border-slate-300 bg-white px-4 text-sm font-medium text-slate-700 transition hover:bg-slate-100; }
+  .input { @apply min-h-[40px] w-full rounded-xl border border-slate-300 bg-white px-3 text-sm outline-none focus:border-slate-900 focus:ring-1 focus:ring-slate-900; }
+  .label { @apply mb-1 block text-xs font-medium text-slate-600; }
+  .th { @apply px-3 py-2 text-left text-xs font-medium text-slate-500; }
+  .td { @apply px-3 py-2.5 text-sm; }
+  .chip { @apply rounded-lg px-2.5 py-1.5 text-xs font-medium; }
+}
+
+/* Kayan şerit */
+@keyframes ticker { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+.ticker-track { animation: ticker 60s linear infinite; width: max-content; }
+.ticker:hover .ticker-track { animation-play-state: paused; }
+@media (prefers-reduced-motion: reduce) { .ticker-track { animation: none; } }
+
+/* ---------- Koyu tema ----------
+   Sayfalardaki açık renk sınıfları burada koyu karşılıklarına eşlenir. */
+html.dark body {
+  background-color: #070b14; color: #e2e8f0;
+  background-image: radial-gradient(1200px 500px at 10% -10%, rgba(37, 99, 235, 0.16), transparent 60%),
+    radial-gradient(900px 400px at 100% 0%, rgba(16, 185, 129, 0.10), transparent 60%);
+}
+html.dark .card { background-color: #0d1424; border-color: #1e293b; box-shadow: 0 1px 0 rgba(255,255,255,0.03) inset, 0 8px 24px rgba(0,0,0,0.25); }
+html.dark .bg-white, html.dark .hover\:bg-white:hover { background-color: #0d1424; }
+html.dark .bg-white\/95 { background-color: rgba(9, 14, 26, 0.88); }
+html.dark .bg-slate-50, html.dark .bg-slate-50\/60 { background-color: #111a2e; }
+html.dark .bg-slate-100, html.dark .hover\:bg-slate-100:hover { background-color: #17223a; }
+html.dark .bg-slate-200\/70 { background-color: #17223a; }
+html.dark .bg-slate-200, html.dark .hover\:bg-slate-200:hover { background-color: #1e2a44; }
+html.dark .bg-slate-300 { background-color: #334155; }
+html.dark .bg-slate-900 { background-color: #e2e8f0; color: #0b1220; }
+html.dark .hover\:bg-slate-700:hover { background-color: #cbd5e1; }
+html.dark .bg-slate-900 .text-white, html.dark .bg-slate-900.text-white { color: #0b1220; }
+html.dark .text-slate-900, html.dark .text-slate-800 { color: #f1f5f9; }
+html.dark .text-slate-700 { color: #cbd5e1; }
+html.dark .text-slate-600 { color: #a8b3c7; }
+html.dark .text-slate-500 { color: #8492a8; }
+html.dark .text-slate-400 { color: #64748b; }
+html.dark .text-slate-300 { color: #475569; }
+html.dark .border-slate-100, html.dark .divide-slate-100 > * + * { border-color: #1a2438; }
+html.dark .border-slate-200 { border-color: #1e293b; }
+html.dark .border-slate-300 { border-color: #2b3850; }
+html.dark .ring-slate-200, html.dark .ring-slate-300 { --tw-ring-color: #2b3850; }
+html.dark .bg-emerald-50 { background-color: rgba(16, 185, 129, 0.12); }
+html.dark .text-emerald-800 { color: #6ee7b7; }
+html.dark .ring-emerald-200 { --tw-ring-color: rgba(16, 185, 129, 0.35); }
+html.dark .bg-red-50 { background-color: rgba(239, 68, 68, 0.12); }
+html.dark .text-red-800, html.dark .text-red-700 { color: #fca5a5; }
+html.dark .ring-red-200, html.dark .border-red-200 { --tw-ring-color: rgba(239, 68, 68, 0.35); border-color: rgba(239, 68, 68, 0.35); }
+html.dark .bg-amber-50, html.dark .bg-amber-100 { background-color: rgba(245, 158, 11, 0.14); }
+html.dark .text-amber-900, html.dark .text-amber-800, html.dark .text-amber-700 { color: #fcd34d; }
+html.dark .border-amber-200, html.dark .border-amber-300 { border-color: rgba(245, 158, 11, 0.35); }
+html.dark .ring-amber-200 { --tw-ring-color: rgba(245, 158, 11, 0.35); }
+html.dark .bg-sky-50, html.dark .bg-sky-100 { background-color: rgba(56, 189, 248, 0.12); }
+html.dark .text-sky-800, html.dark .text-sky-900 { color: #7dd3fc; }
+html.dark .border-sky-200, html.dark .ring-sky-200, html.dark .ring-sky-300 { border-color: rgba(56, 189, 248, 0.35); --tw-ring-color: rgba(56, 189, 248, 0.35); }
+html.dark .text-violet-700 { color: #c4b5fd; }
+html.dark .input { background-color: #0b1220; border-color: #2b3850; color: #e2e8f0; }
+html.dark .input:focus { border-color: #94a3b8; --tw-ring-color: #94a3b8; }
+html.dark .btn-ghost { background-color: #0d1424; border-color: #2b3850; color: #cbd5e1; }
+html.dark .btn-ghost:hover { background-color: #17223a; }
+html.dark .text-up { color: #34d399; }
+html.dark .text-down { color: #f87171; }
+html.dark select option { background: #0b1220; }
