@@ -4,7 +4,7 @@ import {
 } from "./data";
 import { analyzeShort, type ShortAnalysis } from "./analysis/short";
 import { analyzeLong, computeMetrics, type LongAnalysis, type PeerRow } from "./analysis/long";
-import { companyView, hasCompanyView, PEERS, type CompanyView } from "./analysis/company";
+import { companyView, PEERS, type CompanyView } from "./analysis/company";
 import { decide, type Decision, type PositionCtx } from "./analysis/decision";
 import { getPortfolio, type Portfolio } from "./portfolio-data";
 import { getSettings, type Settings } from "./settings";
@@ -54,7 +54,7 @@ export async function analyzeInstrument(inst: Instrument, ctx: { settings: Setti
   let long: LongAnalysis | null = null, company: CompanyView | null = null;
   if (inst.type === "stock") {
     const metrics = computeMetrics(st.statements, quote?.market_cap ?? null);
-    company = hasCompanyView(inst.symbol) || true ? await companyView(inst.symbol, disclosures, metrics) : null;
+    company = await companyView(inst.symbol, disclosures, metrics);
     const peers = ctx.deep !== false ? await peerRows(inst.symbol) : [];
     long = analyzeLong({ metrics, price: quote?.price ?? null, peers, settings: ctx.settings, extraChangers: company?.changers });
     if (company && long.ok) {
