@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import { useChartTheme } from "./theme";
 import { createChart, CrosshairMode, LineStyle } from "lightweight-charts";
 
 type Pt = { time: string; value: number };
@@ -7,6 +8,7 @@ const nf = new Intl.NumberFormat("tr-TR", { minimumFractionDigits: 2, maximumFra
 
 /** RSI (14) ve MACD (12-26-9) panelleri; son 1 yıl gösterilir. */
 export default function IndicatorChart({ rsi, macd, signal, hist }: { rsi: Pt[]; macd: Pt[]; signal: Pt[]; hist: Pt[] }) {
+  const th = useChartTheme();
   const rsiRef = useRef<HTMLDivElement>(null);
   const macdRef = useRef<HTMLDivElement>(null);
   const [hover, setHover] = useState<{ time: string; rsi?: number; macd?: number; sig?: number; hist?: number } | null>(null);
@@ -14,10 +16,10 @@ export default function IndicatorChart({ rsi, macd, signal, hist }: { rsi: Pt[];
   useEffect(() => {
     if (!rsiRef.current || !macdRef.current) return;
     const base = {
-      layout: { background: { color: "#ffffff" }, textColor: "#475569", fontSize: 11 },
-      grid: { vertLines: { color: "#f8fafc" }, horzLines: { color: "#f1f5f9" } },
-      rightPriceScale: { borderColor: "#e2e8f0" },
-      timeScale: { borderColor: "#e2e8f0" },
+      layout: { background: { color: th.bg }, textColor: th.text, fontSize: 11 },
+      grid: { vertLines: { color: th.grid }, horzLines: { color: th.grid } },
+      rightPriceScale: { borderColor: th.border },
+      timeScale: { borderColor: th.border },
       crosshair: { mode: CrosshairMode.Magnet },
       localization: { locale: "tr-TR", priceFormatter: (p: number) => nf.format(p) },
       handleScale: { axisPressedMouseMove: false },
@@ -55,7 +57,7 @@ export default function IndicatorChart({ rsi, macd, signal, hist }: { rsi: Pt[];
     const ro = new ResizeObserver(() => { c1.applyOptions({ width: rsiRef.current!.clientWidth }); c2.applyOptions({ width: macdRef.current!.clientWidth }); });
     ro.observe(rsiRef.current);
     return () => { ro.disconnect(); c1.remove(); c2.remove(); };
-  }, [rsi, macd, signal, hist]);
+  }, [rsi, macd, signal, hist, th]);
 
   const lastR = rsi[rsi.length - 1]?.value, lastM = macd[macd.length - 1]?.value, lastS = signal[signal.length - 1]?.value, lastH = hist[hist.length - 1]?.value;
   const r = hover?.rsi ?? lastR, m = hover?.macd ?? lastM, s = hover?.sig ?? lastS, h = hover?.hist ?? lastH;

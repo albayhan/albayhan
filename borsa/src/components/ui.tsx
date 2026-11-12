@@ -49,9 +49,10 @@ export function Notice({ kind = "warn", children }: { kind?: "warn" | "info" | "
   return <div className={`rounded-xl border px-3 py-2 text-sm ${c}`}>{children}</div>;
 }
 
-export function Stat({ label, value, sub, valueClass = "" }: { label: string; value: React.ReactNode; sub?: React.ReactNode; valueClass?: string }) {
+export function Stat({ label, value, sub, valueClass = "", accent = "from-blue-600 to-emerald-500" }: { label: string; value: React.ReactNode; sub?: React.ReactNode; valueClass?: string; accent?: string }) {
   return (
-    <div className="card !p-4">
+    <div className="card card-hover relative overflow-hidden !p-4">
+      <div className={`absolute inset-x-0 top-0 h-1 bg-gradient-to-r ${accent}`} />
       <p className="text-xs font-medium text-slate-500">{label}</p>
       <p className={`mt-1 text-xl font-semibold tracking-tight sm:text-2xl ${valueClass}`}>{value}</p>
       {sub ? <p className="mt-0.5 text-xs text-slate-500">{sub}</p> : null}
@@ -72,4 +73,17 @@ const ACTION_STYLE: Record<string, string> = {
 /** Sinyal ekranındaki net eylem etiketi */
 export function ActionBadge({ action, size = "sm" }: { action: string; size?: "sm" | "lg" }) {
   return <span className={`inline-flex whitespace-nowrap rounded-md font-bold tracking-wide ring-1 ring-inset ${size === "lg" ? "px-3 py-1.5 text-sm" : "px-2 py-0.5 text-[11px]"} ${ACTION_STYLE[action] ?? ACTION_STYLE.BEKLE}`}>{action}</span>;
+}
+
+/** Yön oku: yukarı / yatay / aşağı */
+export function DirArrow({ dir, conf, label = false }: { dir: "yukari" | "yatay" | "asagi"; conf?: string; label?: boolean }) {
+  const c = dir === "yukari" ? "text-up" : dir === "asagi" ? "text-down" : "text-slate-400";
+  const d = dir === "yukari" ? "M7 17 17 7M9 7h8v8" : dir === "asagi" ? "M7 7l10 10M17 9v8H9" : "M5 12h14M13 7l5 5-5 5";
+  const op = conf === "güçlü" ? "opacity-100" : conf === "orta" ? "opacity-80" : "opacity-60";
+  return (
+    <span className={`inline-flex items-center gap-1 ${c} ${op}`} title={`${dir === "yukari" ? "Yukarı" : dir === "asagi" ? "Aşağı" : "Yatay"}${conf ? ` (${conf})` : ""}`}>
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={conf === "güçlü" ? 3 : 2.2} strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d={d} /></svg>
+      {label ? <span className="text-xs font-semibold">{dir === "yukari" ? "Yukarı" : dir === "asagi" ? "Aşağı" : "Yatay"}{conf ? <span className="font-normal text-slate-500"> · {conf}</span> : null}</span> : null}
+    </span>
+  );
 }

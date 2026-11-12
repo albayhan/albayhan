@@ -9,6 +9,10 @@ import { macd as macdCalc, rsi as rsiCalc, sma } from "@/lib/indicators";
 import { backtestShort } from "@/lib/backtest";
 import { toAction } from "@/lib/scan";
 import { listAlerts } from "@/lib/alerts";
+import { ensureStock } from "@/lib/market";
+import { analyzeChart } from "@/lib/chartAnalysis";
+import { explain } from "@/lib/explain";
+import { ExplanationView, OddsPanel, OutlookCard, PatternList, ScenarioCards } from "@/components/Outlook";
 import IndicatorChart from "@/components/IndicatorChart";
 import { ColumnBars, Meter } from "@/components/charts";
 import { removeAlertAction } from "@/app/actions";
@@ -22,7 +26,8 @@ export const dynamic = "force-dynamic";
 
 export default async function Hisse({ params }: { params: Promise<{ symbol: string }> }) {
   const symbol = (await params).symbol.toUpperCase();
-  const inst = await getInstrument(symbol);
+  let inst = await getInstrument(symbol);
+  if (!inst && (await ensureStock(symbol))) inst = await getInstrument(symbol);
   if (!inst || inst.type !== "stock") notFound();
   const [settings, portfolio] = await Promise.all([getSettings(), getPortfolio()]);
   const [a, history, alerts] = await Promise.all([analyzeInstrument(inst, { settings, portfolio, deep: true }), recommendationHistory(symbol), listAlerts()]);
@@ -44,6 +49,23 @@ export default async function Hisse({ params }: { params: Promise<{ symbol: stri
   const noOpen = bars.filter((b) => b.open === null).length;
   const action = toAction(a);
   const bt = backtestShort(bars, settings);
+  const ch = analyzeChart(bars);
+  const ex = explain(a, ch, bt, action);
+  if (ch.channel) {
+    const cl = ch.channel.line;
+    overlays.push(
+      { name: "Kanal üst", color: "#0ea5e9", data: cl.map((x) => ({ time: x.time, value: x.upper })), style: "dotted", group: "channel", width: 1 } as any,
+      { name: "Kanal orta", color: "#0ea5e9", data: cl.map((x) => ({ time: x.time, value: x.mid })), style: "dashed", group: "channel", width: 1 } as any,
+      { name: "Kanal alt", color: "#0ea5e9", data: cl.map((x) => ({ time: x.time, value: x.lower })), style: "dotted", group: "channel", width: 1 } as any,
+    );
+  }
+  if (ch.projection.length > 1) {
+    overlays.push(
+      { name: "Olası üst", color: "#d946ef", data: ch.projection.map((x) => ({ time: x.time, value: x.high68 })), style: "dashed", group: "proj", width: 2 } as any,
+      { name: "Olası orta", color: "#a855f7", data: ch.projection.map((x) => ({ time: x.time, value: x.mid })), style: "dotted", group: "proj", width: 1 } as any,
+      { name: "Olası alt", color: "#d946ef", data: ch.projection.map((x) => ({ time: x.time, value: x.low68 })), style: "dashed", group: "proj", width: 2 } as any,
+    );
+  }
   const markers: Marker[] = bt.ok ? bt.trades.flatMap((t) => [
     { time: t.entryDate, kind: "buy" as const, text: "AL" },
     ...(t.exit !== "açık" ? [{ time: t.exitDate, kind: "sell" as const, text: `${t.exit === "hedef" ? "Hedef" : t.exit === "zarar-kes" ? "Stop" : "Süre"} ${t.retPct > 0 ? "+" : ""}${t.retPct.toFixed(1)}%` }] : []),
@@ -67,7 +89,7 @@ export default async function Hisse({ params }: { params: Promise<{ symbol: stri
       <div>
         <Link href="/izleme" className="text-sm text-slate-500 underline">← İzleme Listesi</Link>
         <div className="mt-1 flex flex-wrap items-start justify-between gap-3">
-          <div><h1 className="text-xl font-bold tracking-tight">{symbol}</h1><p className="text-sm text-slate-500">{inst.name}</p></div>
+          <div><h1 className="text-2xl font-bold tracking-tight">{symbol}</h1><p className="text-sm text-slate-500">{inst.name}</p></div>
           <div className="flex flex-col items-end gap-1"><ActionBadge action={action} size="lg" /><StatusBadge status={d.status} /></div>
         </div>
         <div className="mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1">
@@ -80,14 +102,24 @@ export default async function Hisse({ params }: { params: Promise<{ symbol: stri
 
       {a.errors.length ? <Notice>Veri uyarısı: {a.errors.join(" · ")} <Link href="/durum" className="underline">Bağlantı durumu</Link></Notice> : null}
 
-      <section className="card">
-        <h2 className="h-sec">Bugünkü değerlendirme</h2>
-        <dl className="mt-2 grid gap-3 text-sm sm:grid-cols-3">
-          <div><dt className="text-xs font-medium text-slate-500">Neden</dt><dd>{d.reason}</dd></div>
-          <div><dt className="text-xs font-medium text-slate-500">Karşı sinyal</dt><dd>{d.counter}</dd></div>
-          <div><dt className="text-xs font-medium text-slate-500">Kararı ne değiştirir</dt><dd>{d.changeCondition}</dd></div>
-        </dl>
-        {d.sizeHint ? <p className="mt-2 text-sm"><span className="text-xs font-medium text-slate-500">Pozisyon büyüklüğü: </span>{d.sizeHint}</p> : null}
+      {ch.ok && ch.shortOutlook && ch.midOutlook ? (
+        <section className="card" aria-label="Yön görünümü">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h2 className="h-sec">🧭 Grafik ne yöne gidiyor?</h2>
+            <p className="text-xs text-slate-500">Trend, ivme, formasyon ve geçmiş benzer durumların birleşik okuması</p>
+          </div>
+          <div className="mt-3 grid gap-3 md:grid-cols-2">
+            <OutlookCard o={ch.shortOutlook} sub={ch.channel ? `60 günlük kanal: aylık ${ch.channel.slopePctMonth >= 0 ? "+" : ""}${fmtNum(ch.channel.slopePctMonth, 1)}% · uyum (R²) ${fmtNum(ch.channel.r2, 2)} · fiyat kanalın %${fmtNum(ch.channel.positionPct, 0)} seviyesinde` : undefined} />
+            <OutlookCard o={ch.midOutlook} sub={ch.high52 && ch.low52 ? `52 hafta: dip ${fmtNum(ch.low52)} · zirve ${fmtNum(ch.high52)} · ${ch.price >= ch.high52 * 0.999 ? "fiyat zirvede" : `fiyat zirvenin %${fmtNum((1 - ch.price / ch.high52) * 100, 1)} altında`}` : undefined} />
+          </div>
+          <div className="mt-3"><OddsPanel ch={ch} /></div>
+          <p className="mt-2 text-[11px] text-slate-500">Yön görünümü olasılık bildirir, kesinlik değil. “Güçlü” bile olsa fiyat tersine gidebilir; bu yüzden her senaryonun bir zarar-kes seviyesi vardır.</p>
+        </section>
+      ) : null}
+
+      <section className="card" aria-label="Detaylı değerlendirme">
+        <h2 className="h-sec mb-3">📋 Detaylı değerlendirme — neden {action}?</h2>
+        <ExplanationView e={ex} action={action} />
         {a.position ? <p className="mt-2 text-xs text-slate-500">Pozisyonunuz: {fmtNum(a.position.qty, 0)} adet · ortalama maliyet {fmtNum(a.position.avgCost)} · K/Z {fmtPct(a.position.plPct)} · ağırlık %{fmtNum(a.position.weightPct, 1)}</p> : null}
       </section>
 
@@ -116,6 +148,15 @@ export default async function Hisse({ params }: { params: Promise<{ symbol: stri
         <Stamp className="mt-2" source={`${bars[bars.length - 1]?.source ?? "—"} (temettü ve bölünmeye göre düzeltilmiş günlük seri)`} dataAt={bars[bars.length - 1]?.date} dateOnly fetchedAt={quote?.fetched_at} />
         {noOpen > 0 ? <p className="mt-1 text-[11px] text-slate-500">Bu kaynağın günlük serisinde açılış fiyatı yoktur: {noOpen} günde mum yalnızca en yüksek–en düşük aralığı ve kapanışı gösterir (gövde çizilmez). Açılış, fiyat kaydından alınabildiği günlerde eklenir; tam mum için anahtarlı sağlayıcı (EODHD) bağlanabilir.</p> : null}
       </section>
+
+      {ch.ok ? (
+        <section className="card" aria-label="Formasyonlar ve senaryolar">
+          <h2 className="h-sec mb-3">🔍 Grafik formasyonları</h2>
+          <PatternList ch={ch} />
+          <h3 className="mb-2 mt-5 text-sm font-semibold">Senaryolar ve olası aralık</h3>
+          <ScenarioCards ch={ch} />
+        </section>
+      ) : null}
 
       {closes.length > 60 ? (
         <section className="card">

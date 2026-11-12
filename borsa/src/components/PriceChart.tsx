@@ -1,9 +1,10 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import { useChartTheme } from "./theme";
 import { createChart, CrosshairMode, LineStyle, type IChartApi } from "lightweight-charts";
 
 export interface Candle { time: string; open: number; high: number; low: number; close: number; volume: number | null; hasOpen: boolean }
-export interface Overlay { name: string; color: string; data: { time: string; value: number }[] }
+export interface Overlay { name: string; color: string; data: { time: string; value: number }[]; style?: "dashed" | "dotted"; group?: "proj" | "channel"; width?: number }
 export interface PriceLevel { price: number; title: string; color: string }
 export interface Marker { time: string; kind: "buy" | "sell"; text: string }
 
@@ -12,7 +13,10 @@ const nf = new Intl.NumberFormat("tr-TR", { minimumFractionDigits: 2, maximumFra
 const cf = new Intl.NumberFormat("tr-TR", { notation: "compact", maximumFractionDigits: 1 });
 
 export default function PriceChart({ candles, overlays, levels, volumeUnit, markers = [] }: { candles: Candle[]; overlays: Overlay[]; levels: PriceLevel[]; volumeUnit: string; markers?: Marker[] }) {
+  const th = useChartTheme();
   const [showMarkers, setShowMarkers] = useState(true);
+  const [showProj, setShowProj] = useState(true);
+  const [showCh, setShowCh] = useState(true);
   const ref = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const [range, setRange] = useState("6A");
@@ -23,10 +27,10 @@ export default function PriceChart({ candles, overlays, levels, volumeUnit, mark
     const el = ref.current;
     const chart = createChart(el, {
       height: el.clientWidth < 500 ? 320 : 420,
-      layout: { background: { color: "#ffffff" }, textColor: "#475569", fontSize: 11 },
-      grid: { vertLines: { color: "#f1f5f9" }, horzLines: { color: "#f1f5f9" } },
-      rightPriceScale: { borderColor: "#e2e8f0" },
-      timeScale: { borderColor: "#e2e8f0", rightOffset: 3 },
+      layout: { background: { color: th.bg }, textColor: th.text, fontSize: 11 },
+      grid: { vertLines: { color: th.grid }, horzLines: { color: th.grid } },
+      rightPriceScale: { borderColor: th.border },
+      timeScale: { borderColor: th.border, rightOffset: 3 },
       crosshair: { mode: CrosshairMode.Normal },
       localization: { locale: "tr-TR", priceFormatter: (p: number) => nf.format(p) },
       handleScale: { axisPressedMouseMove: false },
@@ -39,7 +43,11 @@ export default function PriceChart({ candles, overlays, levels, volumeUnit, mark
     chart.priceScale("vol").applyOptions({ scaleMargins: { top: 0.82, bottom: 0 }, visible: false });
     vs.setData(candles.filter((c) => c.volume !== null).map((c, i, a) => ({ time: c.time, value: c.volume!, color: i > 0 && c.close < a[i - 1].close ? "#f3c4c2" : "#b7e0d1" })));
     for (const o of overlays) {
-      chart.addLineSeries({ color: o.color, lineWidth: 2, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false }).setData(o.data);
+      if ((o.group === "proj" && !showProj) || (o.group === "channel" && !showCh)) continue;
+      chart.addLineSeries({
+        color: o.color, lineWidth: (o.width ?? 2) as any, priceLineVisible: false, lastValueVisible: o.group === "proj", crosshairMarkerVisible: false,
+        lineStyle: o.style === "dashed" ? LineStyle.Dashed : o.style === "dotted" ? LineStyle.Dotted : LineStyle.Solid,
+      }).setData(o.data);
     }
     if (showMarkers && markers.length) {
       cs.setMarkers([...markers].sort((a, b) => a.time.localeCompare(b.time)).map((m) => ({
@@ -53,15 +61,16 @@ export default function PriceChart({ candles, overlays, levels, volumeUnit, mark
     const ro = new ResizeObserver(() => chart.applyOptions({ width: el.clientWidth }));
     ro.observe(el);
     return () => { ro.disconnect(); chart.remove(); chartRef.current = null; };
-  }, [candles, overlays, levels, markers, showMarkers]);
+  }, [candles, overlays, levels, markers, showMarkers, showProj, showCh, th]);
 
   useEffect(() => {
     const chart = chartRef.current;
     if (!chart || !candles.length) return;
     const d = RANGES.find((r) => r.k === range)!.d;
     const from = candles[Math.max(0, candles.length - d)].time;
-    chart.timeScale().setVisibleRange({ from, to: candles[candles.length - 1].time });
-  }, [range, candles, showMarkers]);
+    const lastOv = showProj ? overlays.filter((o) => o.group === "proj").map((o) => o.data[o.data.length - 1]?.time).filter(Boolean).sort().pop() : undefined;
+    chart.timeScale().setVisibleRange({ from, to: lastOv && lastOv > candles[candles.length - 1].time ? lastOv : candles[candles.length - 1].time });
+  }, [range, candles, showMarkers, showProj, showCh, th, overlays]);
 
   const c = hover ?? candles[candles.length - 1];
   return (
@@ -86,11 +95,17 @@ export default function PriceChart({ candles, overlays, levels, volumeUnit, mark
       </div>
       <div ref={ref} className="w-full" data-testid="price-chart" />
       <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-600">
-        {overlays.map((o) => (
+        {overlays.filter((o) => !o.group).map((o) => (
           <span key={o.name} className="flex items-center gap-1.5"><span className="h-0.5 w-4" style={{ background: o.color }} />{o.name}</span>
         ))}
         <span className="flex items-center gap-1.5"><span className="h-0 w-4 border-t border-dashed border-emerald-700" />Destek</span>
         <span className="flex items-center gap-1.5"><span className="h-0 w-4 border-t border-dashed border-red-700" />Direnç</span>
+        {overlays.some((o) => o.group === "channel") ? (
+          <label className="flex cursor-pointer items-center gap-1.5"><input type="checkbox" checked={showCh} onChange={(e) => setShowCh(e.target.checked)} /><span className="h-0 w-4 border-t-2 border-dotted border-sky-500" />Trend kanalı</label>
+        ) : null}
+        {overlays.some((o) => o.group === "proj") ? (
+          <label className="flex cursor-pointer items-center gap-1.5"><input type="checkbox" checked={showProj} onChange={(e) => setShowProj(e.target.checked)} /><span className="h-0 w-4 border-t-2 border-dashed border-fuchsia-500" />20 günlük olası aralık</label>
+        ) : null}
         {markers.length ? (
           <label className="ml-auto flex cursor-pointer items-center gap-1.5">
             <input type="checkbox" checked={showMarkers} onChange={(e) => setShowMarkers(e.target.checked)} />

@@ -25,7 +25,7 @@ export default async function Fon({ params }: { params: Promise<{ code: string }
     <div className="space-y-5">
       <div>
         <Link href="/izleme" className="text-sm text-slate-500 underline">← İzleme Listesi</Link>
-        <h1 className="mt-1 text-xl font-bold tracking-tight">{code} <span className="ml-1 rounded bg-slate-100 px-1.5 py-0.5 text-xs font-medium text-slate-600">TEFAS fonu</span></h1>
+        <h1 className="mt-1 text-2xl font-bold tracking-tight">{code} <span className="ml-1 rounded bg-slate-100 px-1.5 py-0.5 text-xs font-medium text-slate-600">TEFAS fonu</span></h1>
         <p className="text-sm text-slate-500">{inst.name !== code ? inst.name : "Fon unvanı TEFAS'tan alınamadı"}</p>
         <div className="mt-2 flex flex-wrap items-baseline gap-3"><span className="text-3xl font-semibold tracking-tight">{quote ? fmtNum(quote.price, 6) : "—"} <span className="text-lg">₺</span></span><KindBadge quote={quote} stale={stale} /></div>
         <QuoteStamp quote={quote} stale={stale} className="mt-1" />

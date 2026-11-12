@@ -15,7 +15,7 @@ export default async function Islemler({ searchParams }: { searchParams: Promise
   const txs = (await loadTxs()).reverse();
   return (
     <div className="space-y-5">
-      <div><Link href="/" className="text-sm text-slate-500 underline">← Portföy</Link><h1 className="mt-1 text-xl font-bold tracking-tight">İşlemler</h1></div>
+      <div><Link href="/" className="text-sm text-slate-500 underline">← Portföy</Link><h1 className="mt-1 text-2xl font-bold tracking-tight">İşlemler</h1></div>
       {sp.hata ? <Notice kind="error">{sp.hata}</Notice> : null}
       <section className="card"><h2 className="h-sec mb-3">İşlem ekle</h2><TxForm today={istDate()} /></section>
       <section className="card">

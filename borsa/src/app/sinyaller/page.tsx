@@ -3,7 +3,7 @@ import { getLastScan, runScan, scanIsOld, scanProgress, ACTION_ORDER, type ScanR
 import { listAlerts } from "@/lib/alerts";
 import { getQuotes } from "@/lib/data";
 import { fmtDateTime, fmtNum, fmtPct } from "@/lib/format";
-import { ActionBadge, Notice, tone } from "@/components/ui";
+import { ActionBadge, DirArrow, Notice, tone } from "@/components/ui";
 import { DivergingBars, Meter, Sparkline } from "@/components/charts";
 import AutoRefresh from "@/components/AutoRefresh";
 import { removeAlertAction, runScanAction, markAlertsSeenAction } from "../actions";
@@ -23,6 +23,7 @@ const SORTS: Record<string, { label: string; fn: (a: ScanRow, b: ScanRow) => num
   gun: { label: "Günlük", fn: (a, b) => (b.changePct ?? -1e9) - (a.changePct ?? -1e9) },
   ay: { label: "1 ay", fn: (a, b) => (b.ret1m ?? -1e9) - (a.ret1m ?? -1e9) },
   yil: { label: "1 yıl", fn: (a, b) => (b.ret1y ?? -1e9) - (a.ret1y ?? -1e9) },
+  yon: { label: "Yön (2 hafta)", fn: (a, b) => (b.outlook?.sScore ?? -999) - (a.outlook?.sScore ?? -999) },
   isabet: { label: "Geçmiş isabet", fn: (a, b) => (b.bt?.winRatePct ?? -1) - (a.bt?.winRatePct ?? -1) },
 };
 const VIEW: Record<string, string> = { olumlu: "Olumlu", notr: "Nötr", olumsuz: "Olumsuz" };
@@ -52,7 +53,14 @@ function Pick({ r }: { r: ScanRow }) {
           <div><p className="text-slate-500">Risk/ödül</p><p className="font-semibold">{fmtNum(r.rr)}</p></div>
         </div>
       ) : null}
+      {r.outlook ? (
+        <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
+          <div className="rounded-lg bg-slate-50 px-2 py-1.5"><p className="text-[10px] text-slate-500">2 hafta</p><DirArrow dir={r.outlook.s} conf={r.outlook.sConf} label /></div>
+          <div className="rounded-lg bg-slate-50 px-2 py-1.5"><p className="text-[10px] text-slate-500">3 ay</p><DirArrow dir={r.outlook.m} conf={r.outlook.mConf} label /></div>
+        </div>
+      ) : null}
       <p className="mt-2 text-sm">{r.reason}</p>
+      {r.outlook?.patterns.length ? <p className="mt-1 text-xs text-slate-600">{r.outlook.patterns.slice(0, 3).join(" · ")}</p> : null}
       <p className="mt-1 text-xs text-slate-500"><span className="font-medium text-slate-700">Ne değiştirir:</span> {r.changeCondition}</p>
       <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-slate-500">
         <span>Teknik puan <b className={tone(r.score)}>{r.score > 0 ? "+" : ""}{r.score}</b></span>
@@ -77,7 +85,7 @@ export default async function Sinyaller({ searchParams }: { searchParams: Promis
     const p = scanProgress();
     return (
       <div className="space-y-4">
-        <h1 className="text-xl font-bold tracking-tight">Sinyaller</h1>
+        <h1 className="text-2xl font-bold tracking-tight">Sinyaller</h1>
         <div className="card text-center">
           <p className="font-semibold">İlk tarama yapılıyor…</p>
           <p className="mt-1 text-sm text-slate-600">30 büyük BIST hissesi, izleme listesi ve portföyünüz için 3 yıllık fiyat, bilanço ve KAP verisi alınıyor. İlk tarama birkaç dakika sürebilir; sonrakiler önbellekten hızlı gelir.</p>
@@ -114,7 +122,7 @@ export default async function Sinyaller({ searchParams }: { searchParams: Promis
       {running ? <AutoRefresh ms={5000} /> : null}
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-xl font-bold tracking-tight">Sinyaller</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Sinyaller</h1>
           <p className="text-xs text-slate-500">{scan.rows.length} hisse tarandı · son tarama {fmtDateTime(scan.at)} ({Math.round(scan.durationMs / 1000)} sn){running ? ` · yeni tarama sürüyor ${scanProgress()?.done ?? 0}/${scanProgress()?.total ?? "…"}` : ""}</p>
         </div>
         <form action={runScanAction}><button className="btn" disabled={running}>{running ? "Taranıyor…" : "Şimdi tara"}</button></form>
@@ -145,7 +153,7 @@ export default async function Sinyaller({ searchParams }: { searchParams: Promis
 
       {btWin !== null ? (
         <div className="rounded-xl border border-slate-200 bg-white p-3 text-sm">
-          <span className="font-semibold">Modelin geçmiş karnesi:</span> son 2 yılda bu {scan.rows.length} hissede {btTrades} AL sinyali verdi; %{fmtNum(btWin, 0)}'i kârla kapandı, işlem başına ortalama <span className={tone(btAvg)}>{fmtPct(btAvg, 2)}</span> (komisyonsuz).
+          <span className="font-semibold">Modelin geçmiş karnesi:</span> son 2 yılda bu {scan.rows.length} hissede {btTrades} AL sinyali verdi; kârla kapanma oranı %{fmtNum(btWin, 0)}, işlem başına ortalama <span className={tone(btAvg)}>{fmtPct(btAvg, 2)}</span> (komisyonsuz).
           {btAvg !== null && btAvg <= 0 ? " Ortalama getiri negatif: bu kural geçmişte tek başına kazandırmadı; sinyalleri tek başına değil, başka bilgilerle birlikte değerlendirin." : btWin < 40 ? " İsabet düşük ama kazançlar kayıplardan büyük; sonuç zarar-kese uymaya bağlı." : ""}
         </div>
       ) : null}
@@ -170,6 +178,7 @@ export default async function Sinyaller({ searchParams }: { searchParams: Promis
             <li key={r.symbol} className="flex items-center gap-3 py-2">
               <div className="w-20"><Link href={`/hisse/${r.symbol}`} className="font-semibold hover:underline">{r.symbol}</Link><p className={`text-xs ${tone(r.changePct)}`}>{fmtPct(r.changePct)}</p></div>
               <Sparkline data={r.spark} width={90} height={28} />
+              {r.outlook ? <DirArrow dir={r.outlook.s} conf={r.outlook.sConf} /> : null}
               <p className="flex-1 text-xs text-slate-600">{r.reason}</p>
             </li>))}</ul> : <p className="mt-2 text-sm text-slate-600">Yok.</p>}
         </section>
@@ -183,6 +192,36 @@ export default async function Sinyaller({ searchParams }: { searchParams: Promis
             </li>))}</ul> : <p className="mt-2 text-sm text-slate-600">Yok.</p>}
         </section>
       </div>
+
+      {(() => {
+        const withO = scan.rows.filter((r) => r.outlook);
+        const ups = withO.filter((r) => r.outlook!.s === "yukari").sort((a, b) => b.outlook!.sScore - a.outlook!.sScore);
+        const downs = withO.filter((r) => r.outlook!.s === "asagi").sort((a, b) => a.outlook!.sScore - b.outlook!.sScore);
+        const flat = withO.length - ups.length - downs.length;
+        if (!withO.length) return null;
+        return (
+          <section className="card" aria-label="Yön görünümü">
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <h2 className="h-sec">🧭 2 haftalık yön görünümü</h2>
+              <p className="text-xs text-slate-500"><span className="text-up">{ups.length} yukarı</span> · {flat} yatay · <span className="text-down">{downs.length} aşağı</span></p>
+            </div>
+            <div className="mt-2 flex h-2.5 overflow-hidden rounded-full">
+              <div className="bg-up" style={{ width: `${(ups.length / withO.length) * 100}%` }} /><div className="bg-slate-300" style={{ width: `${(flat / withO.length) * 100}%` }} /><div className="bg-down" style={{ width: `${(downs.length / withO.length) * 100}%` }} />
+            </div>
+            <div className="mt-3 grid gap-3 md:grid-cols-2">
+              <div>
+                <p className="mb-1 text-xs font-semibold text-up">↗ Yukarı yönlü</p>
+                <div className="flex flex-wrap gap-1.5">{ups.map((r) => <Link key={r.symbol} href={`/hisse/${r.symbol}`} className="rounded-lg bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-800 hover:brightness-95" title={r.outlook!.patterns.join(" · ")}>{r.symbol} <span className="font-normal opacity-70">{r.outlook!.sConf}</span></Link>)}</div>
+              </div>
+              <div>
+                <p className="mb-1 text-xs font-semibold text-down">↘ Aşağı yönlü</p>
+                <div className="flex flex-wrap gap-1.5">{downs.map((r) => <Link key={r.symbol} href={`/hisse/${r.symbol}`} className="rounded-lg bg-red-50 px-2 py-1 text-xs font-semibold text-red-800 hover:brightness-95" title={r.outlook!.patterns.join(" · ")}>{r.symbol} <span className="font-normal opacity-70">{r.outlook!.sConf}</span></Link>)}</div>
+              </div>
+            </div>
+            <p className="mt-2 text-[11px] text-slate-500">Yön görünümü: 60 günlük trend kanalı, ortalamalar, MACD, formasyonlar ve hissenin kendi geçmişindeki benzer durumların birleşik okuması. Ayrıntısı hisse sayfasında. Olasılıktır, kesinlik değil.</p>
+          </section>
+        );
+      })()}
 
       <div className="grid gap-3 lg:grid-cols-2">
         <section className="card" aria-label="Teknik puan sıralaması">
@@ -206,10 +245,10 @@ export default async function Sinyaller({ searchParams }: { searchParams: Promis
         </div>
         <p className="px-4 pt-2 text-xs text-slate-500 sm:px-5">Sırala: {Object.entries(SORTS).map(([k, v], i) => <span key={k}>{i ? " · " : ""}<Link href={href({ s: k })} className={(sp.s ?? "sinyal") === k ? "font-semibold text-slate-900" : "underline"}>{v.label}</Link></span>)}</p>
         <div className="mt-2 overflow-x-auto">
-          <table className="w-full min-w-[900px]">
+          <table className="w-full min-w-[1000px]">
             <thead><tr className="border-b border-slate-100">
               <th className="th pl-5">Hisse</th><th className="th">Sinyal</th><th className="th text-right">Fiyat</th><th className="th text-right">Gün</th><th className="th text-right">1 ay</th><th className="th text-right">3 ay</th><th className="th text-right">1 yıl</th>
-              <th className="th text-right">RSI</th><th className="th text-right">Puan</th><th className="th">Uzun vade</th><th className="th text-right">Geçmiş isabet</th><th className="th pr-5">60 gün</th>
+              <th className="th text-right">RSI</th><th className="th text-right">Puan</th><th className="th">Yön 2h / 3a</th><th className="th">Uzun vade</th><th className="th text-right">Geçmiş isabet</th><th className="th pr-5">60 gün</th>
             </tr></thead>
             <tbody className="divide-y divide-slate-100">
               {rows.map((r) => (
@@ -223,6 +262,7 @@ export default async function Sinyaller({ searchParams }: { searchParams: Promis
                   <td className={`td text-right ${tone(r.ret1y)}`}>{fmtPct(r.ret1y, 0)}</td>
                   <td className={`td text-right ${r.rsi !== null && r.rsi > 70 ? "text-down" : r.rsi !== null && r.rsi < 30 ? "text-up" : ""}`}>{fmtNum(r.rsi, 0)}</td>
                   <td className={`td text-right font-medium ${tone(r.score)}`}>{r.score > 0 ? "+" : ""}{r.score}</td>
+                  <td className="td">{r.outlook ? <span className="flex items-center gap-2"><DirArrow dir={r.outlook.s} conf={r.outlook.sConf} /><span className="text-slate-300">/</span><DirArrow dir={r.outlook.m} conf={r.outlook.mConf} />{r.outlook.upPct !== null ? <span className="text-[10px] text-slate-500">%{Math.round(r.outlook.upPct)}↑</span> : null}</span> : "—"}</td>
                   <td className="td text-xs">{r.longView ? VIEW[r.longView] : "—"}</td>
                   <td className="td text-right text-xs">{r.bt && r.bt.closed ? <>%{fmtNum(r.bt.winRatePct, 0)} <span className="text-slate-400">({r.bt.closed})</span></> : "—"}</td>
                   <td className="td pr-5"><Sparkline data={r.spark} width={100} height={26} /></td>

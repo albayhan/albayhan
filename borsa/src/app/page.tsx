@@ -12,7 +12,7 @@ import { RISK } from "@/lib/settings";
 
 export const dynamic = "force-dynamic";
 
-const COLORS = ["#0f172a", "#2563eb", "#0f9d6b", "#d97706", "#7c3aed", "#db2777", "#0891b2", "#65a30d"];
+const COLORS = ["#2563eb", "#10b981", "#f59e0b", "#ec4899", "#8b5cf6", "#06b6d4", "#84cc16", "#f97316"];
 
 export default async function Home() {
   const [{ items, portfolio: p, settings }, perf, scan] = await Promise.all([analyzeAll({ deep: true }), getPerformance(), getLastScan()]);
@@ -27,7 +27,7 @@ export default async function Home() {
     <div className="space-y-5">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-xl font-bold tracking-tight">Portföy</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Portföy</h1>
           <p className="text-xs text-slate-500">Risk profili: {RISK[settings.risk].label} · Fiyatlar 15 dk gecikmelidir{asOf ? ` · son fiyat ${fmtDate(asOf)}` : ""}</p>
         </div>
         <Link href="/islemler" className="btn">İşlem ekle</Link>
@@ -165,7 +165,7 @@ export default async function Home() {
           </div>
           <div className="mt-3">
             <LineChart suffix="%" lines={[
-              { name: "Portföy", color: "#0f172a", data: perf.points.map((x) => ({ time: x.date, value: x.twr - 100 })) },
+              { name: "Portföy", color: "#6366f1", data: perf.points.map((x) => ({ time: x.date, value: x.twr - 100 })) },
               { name: "BIST 100", color: "#2563eb", data: perf.points.filter((x) => x.bench !== null).map((x) => ({ time: x.date, value: x.bench! - 100 })) },
             ]} />
           </div>

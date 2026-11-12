@@ -17,7 +17,7 @@ export default async function Ozet() {
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div><h1 className="text-xl font-bold tracking-tight">Günlük Özet</h1><p className="text-xs text-slate-500">Her BIST işlem günü kapanışından sonra 18:40'ta (Europe/Istanbul) otomatik üretilir. Aynı gün için tek rapor yazılır.</p></div>
+        <div><h1 className="text-2xl font-bold tracking-tight">Günlük Özet</h1><p className="text-xs text-slate-500">Her BIST işlem günü kapanışından sonra 18:40'ta (Europe/Istanbul) otomatik üretilir. Aynı gün için tek rapor yazılır.</p></div>
         <RunReportButton />
       </div>
       {latest ? <ReportView r={latest} /> : <div className="card text-sm text-slate-600">Henüz rapor üretilmedi. İlk rapor, bir sonraki seans kapanışından sonra otomatik oluşur.</div>}

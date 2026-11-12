@@ -12,7 +12,7 @@ export default async function OzetGun({ params }: { params: Promise<{ date: stri
   if (!r) notFound();
   return (
     <div className="space-y-5">
-      <div><Link href="/ozet" className="text-sm text-slate-500 underline">← Günlük Özet</Link><h1 className="mt-1 text-xl font-bold tracking-tight">Geçmiş rapor</h1></div>
+      <div><Link href="/ozet" className="text-sm text-slate-500 underline">← Günlük Özet</Link><h1 className="mt-1 text-2xl font-bold tracking-tight">Geçmiş rapor</h1></div>
       <ReportView r={r} />
     </div>
   );

@@ -6,6 +6,7 @@ import { getPortfolio } from "./portfolio-data";
 import { getSettings, RISK } from "./settings";
 import { checkAlerts } from "./alerts";
 import { inSession } from "./time";
+import { analyzeChart, type Dir } from "./chartAnalysis";
 
 /**
  * Tarama listesi: Borsa İstanbul'un büyük ve likit hisseleri (BIST 30 ağırlıklı).
@@ -50,6 +51,7 @@ export interface ScanRow {
   changeCondition: string;
   spark: number[];
   bt: { closed: number; winRatePct: number | null; avgRetPct: number | null; totalRetPct: number | null; buyHoldPct: number | null } | null;
+  outlook?: { s: Dir; sConf: string; sScore: number; m: Dir; mConf: string; mScore: number; upPct: number | null; n: number; patterns: string[] } | null;
   error: string | null;
 }
 export interface ScanResult {
@@ -77,6 +79,13 @@ export function toAction(a: Analyzed): Action {
 }
 
 export function summarize(a: Analyzed, minRR: number, bt: ScanRow["bt"]): ScanRow {
+  const ch = a.bars.length >= 120 ? analyzeChart(a.bars, { projectDays: 0 }) : null;
+  const outlook = ch?.ok && ch.shortOutlook && ch.midOutlook ? {
+    s: ch.shortOutlook.dir, sConf: ch.shortOutlook.confidence, sScore: ch.shortOutlook.score,
+    m: ch.midOutlook.dir, mConf: ch.midOutlook.confidence, mScore: ch.midOutlook.score,
+    upPct: ch.odds[0]?.n >= 15 ? ch.odds[0].upPct : null, n: ch.odds[0]?.n ?? 0,
+    patterns: ch.patterns.filter((p) => p.strength >= 2).map((p) => `${p.bias > 0 ? "▲" : p.bias < 0 ? "▼" : "◆"} ${p.title}`),
+  } : null;
   const s = a.short;
   const closes = a.bars.map((b) => b.close);
   const longScore = a.long?.ok ? a.long.score : null;
@@ -96,6 +105,7 @@ export function summarize(a: Analyzed, minRR: number, bt: ScanRow["bt"]): ScanRo
     reason: a.decision.reason, changeCondition: a.decision.changeCondition,
     spark: closes.slice(-60),
     bt,
+    outlook,
     error: a.errors[0] ?? null,
   };
 }

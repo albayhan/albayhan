@@ -21,7 +21,7 @@ export default async function Analiz({ searchParams }: { searchParams: Promise<{
   const stocks = items.filter((a) => a.long);
   return (
     <div className="space-y-5">
-      <h1 className="text-xl font-bold tracking-tight">Analiz</h1>
+      <h1 className="text-2xl font-bold tracking-tight">Analiz</h1>
 
       <details className="card">
         <summary className="cursor-pointer text-sm font-semibold">Vade ve risk ayarları <span className="font-normal text-slate-500">— kısa vade {settings.shortMinWeeks}–{settings.shortMaxWeeks} hafta · uzun vade {settings.longMinMonths}–{settings.longMaxMonths} ay · {RISK[settings.risk].label}</span></summary>

@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import { useChartTheme } from "./theme";
 import { createChart, CrosshairMode } from "lightweight-charts";
 
 export interface Line { name: string; color: string; data: { time: string; value: number }[] }
@@ -7,6 +8,7 @@ const nf = new Intl.NumberFormat("tr-TR", { minimumFractionDigits: 2, maximumFra
 
 /** Çok serili çizgi grafik. `suffix` değerlerin birimidir (ör. "%"). */
 export default function LineChart({ lines, suffix = "", height = 280 }: { lines: Line[]; suffix?: string; height?: number }) {
+  const th = useChartTheme();
   const ref = useRef<HTMLDivElement>(null);
   const [hover, setHover] = useState<{ time: string; values: (number | null)[] } | null>(null);
   useEffect(() => {
@@ -14,10 +16,10 @@ export default function LineChart({ lines, suffix = "", height = 280 }: { lines:
     const el = ref.current;
     const chart = createChart(el, {
       height,
-      layout: { background: { color: "#ffffff" }, textColor: "#475569", fontSize: 11 },
-      grid: { vertLines: { color: "#f1f5f9" }, horzLines: { color: "#f1f5f9" } },
-      rightPriceScale: { borderColor: "#e2e8f0" },
-      timeScale: { borderColor: "#e2e8f0" },
+      layout: { background: { color: th.bg }, textColor: th.text, fontSize: 11 },
+      grid: { vertLines: { color: th.grid }, horzLines: { color: th.grid } },
+      rightPriceScale: { borderColor: th.border },
+      timeScale: { borderColor: th.border },
       crosshair: { mode: CrosshairMode.Magnet },
       localization: { locale: "tr-TR", priceFormatter: (p: number) => nf.format(p) + suffix },
     });
@@ -34,7 +36,7 @@ export default function LineChart({ lines, suffix = "", height = 280 }: { lines:
     const ro = new ResizeObserver(() => chart.applyOptions({ width: el.clientWidth }));
     ro.observe(el);
     return () => { ro.disconnect(); chart.remove(); };
-  }, [lines, suffix, height]);
+  }, [lines, suffix, height, th]);
   return (
     <div>
       <div className="mb-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-600">

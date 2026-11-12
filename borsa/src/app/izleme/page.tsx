@@ -14,7 +14,7 @@ export default async function Izleme() {
   const quotes = await getQuotes(insts.map((i) => i.symbol));
   return (
     <div className="space-y-5">
-      <h1 className="text-xl font-bold tracking-tight">İzleme Listesi</h1>
+      <h1 className="text-2xl font-bold tracking-tight">İzleme Listesi</h1>
       <section className="card"><SearchAdd /></section>
       <section className="card !p-0">
         <ul className="divide-y divide-slate-100">

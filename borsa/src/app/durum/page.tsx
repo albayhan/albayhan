@@ -14,7 +14,7 @@ export default async function Durum() {
   const enabled: Record<string, boolean> = { eodhd: eodhdEnabled(), evds: evdsEnabled() };
   return (
     <div className="space-y-5">
-      <div><h1 className="text-xl font-bold tracking-tight">Veri kaynakları ve bağlantı durumu</h1><p className="text-xs text-slate-500">Bir kaynak kesildiğinde son doğrulanmış değer tarihiyle gösterilir, güncelliğe bağlı öneriler beklemeye alınır ve bağlantı artan aralıklarla (1 dk → 30 dk) yeniden denenir.</p></div>
+      <div><h1 className="text-2xl font-bold tracking-tight">Veri kaynakları ve bağlantı durumu</h1><p className="text-xs text-slate-500">Bir kaynak kesildiğinde son doğrulanmış değer tarihiyle gösterilir, güncelliğe bağlı öneriler beklemeye alınır ve bağlantı artan aralıklarla (1 dk → 30 dk) yeniden denenir.</p></div>
       <div className="grid gap-3 lg:grid-cols-2">
         {(Object.keys(PROVIDERS) as ProviderId[]).map((id) => {
           const p = PROVIDERS[id], s = st.get(id);
