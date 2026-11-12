@@ -58,3 +58,18 @@ export function Stat({ label, value, sub, valueClass = "" }: { label: string; va
     </div>
   );
 }
+
+const ACTION_STYLE: Record<string, string> = {
+  AL: "bg-emerald-600 text-white ring-emerald-600",
+  SAT: "bg-red-600 text-white ring-red-600",
+  AZALT: "bg-amber-500 text-white ring-amber-500",
+  TUT: "bg-slate-100 text-slate-700 ring-slate-200",
+  "İZLE": "bg-sky-50 text-sky-800 ring-sky-300",
+  BEKLE: "bg-white text-slate-600 ring-slate-300",
+  "UZAK DUR": "bg-red-50 text-red-700 ring-red-200",
+  "VERİ YOK": "bg-white text-slate-400 ring-slate-200",
+};
+/** Sinyal ekranındaki net eylem etiketi */
+export function ActionBadge({ action, size = "sm" }: { action: string; size?: "sm" | "lg" }) {
+  return <span className={`inline-flex whitespace-nowrap rounded-md font-bold tracking-wide ring-1 ring-inset ${size === "lg" ? "px-3 py-1.5 text-sm" : "px-2 py-0.5 text-[11px]"} ${ACTION_STYLE[action] ?? ACTION_STYLE.BEKLE}`}>{action}</span>;
+}

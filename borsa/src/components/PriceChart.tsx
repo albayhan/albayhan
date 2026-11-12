@@ -5,12 +5,14 @@ import { createChart, CrosshairMode, LineStyle, type IChartApi } from "lightweig
 export interface Candle { time: string; open: number; high: number; low: number; close: number; volume: number | null; hasOpen: boolean }
 export interface Overlay { name: string; color: string; data: { time: string; value: number }[] }
 export interface PriceLevel { price: number; title: string; color: string }
+export interface Marker { time: string; kind: "buy" | "sell"; text: string }
 
 const RANGES = [{ k: "3A", d: 66 }, { k: "6A", d: 132 }, { k: "1Y", d: 252 }, { k: "3Y", d: 9999 }];
 const nf = new Intl.NumberFormat("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const cf = new Intl.NumberFormat("tr-TR", { notation: "compact", maximumFractionDigits: 1 });
 
-export default function PriceChart({ candles, overlays, levels, volumeUnit }: { candles: Candle[]; overlays: Overlay[]; levels: PriceLevel[]; volumeUnit: string }) {
+export default function PriceChart({ candles, overlays, levels, volumeUnit, markers = [] }: { candles: Candle[]; overlays: Overlay[]; levels: PriceLevel[]; volumeUnit: string; markers?: Marker[] }) {
+  const [showMarkers, setShowMarkers] = useState(true);
   const ref = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const [range, setRange] = useState("6A");
@@ -39,13 +41,19 @@ export default function PriceChart({ candles, overlays, levels, volumeUnit }: { 
     for (const o of overlays) {
       chart.addLineSeries({ color: o.color, lineWidth: 2, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false }).setData(o.data);
     }
+    if (showMarkers && markers.length) {
+      cs.setMarkers([...markers].sort((a, b) => a.time.localeCompare(b.time)).map((m) => ({
+        time: m.time, position: m.kind === "buy" ? "belowBar" : "aboveBar", color: m.kind === "buy" ? "#0f9d6b" : "#d9443f",
+        shape: m.kind === "buy" ? "arrowUp" : "arrowDown", text: m.text,
+      })));
+    }
     for (const l of levels) cs.createPriceLine({ price: l.price, color: l.color, lineWidth: 1, lineStyle: LineStyle.Dashed, axisLabelVisible: true, title: l.title });
     const byTime = new Map(candles.map((c) => [c.time, c]));
     chart.subscribeCrosshairMove((p) => setHover(p.time ? byTime.get(p.time as string) ?? null : null));
     const ro = new ResizeObserver(() => chart.applyOptions({ width: el.clientWidth }));
     ro.observe(el);
     return () => { ro.disconnect(); chart.remove(); chartRef.current = null; };
-  }, [candles, overlays, levels]);
+  }, [candles, overlays, levels, markers, showMarkers]);
 
   useEffect(() => {
     const chart = chartRef.current;
@@ -53,7 +61,7 @@ export default function PriceChart({ candles, overlays, levels, volumeUnit }: { 
     const d = RANGES.find((r) => r.k === range)!.d;
     const from = candles[Math.max(0, candles.length - d)].time;
     chart.timeScale().setVisibleRange({ from, to: candles[candles.length - 1].time });
-  }, [range, candles]);
+  }, [range, candles, showMarkers]);
 
   const c = hover ?? candles[candles.length - 1];
   return (
@@ -83,6 +91,12 @@ export default function PriceChart({ candles, overlays, levels, volumeUnit }: { 
         ))}
         <span className="flex items-center gap-1.5"><span className="h-0 w-4 border-t border-dashed border-emerald-700" />Destek</span>
         <span className="flex items-center gap-1.5"><span className="h-0 w-4 border-t border-dashed border-red-700" />Direnç</span>
+        {markers.length ? (
+          <label className="ml-auto flex cursor-pointer items-center gap-1.5">
+            <input type="checkbox" checked={showMarkers} onChange={(e) => setShowMarkers(e.target.checked)} />
+            Geçmiş al/sat sinyalleri ({markers.filter((m) => m.kind === "buy").length})
+          </label>
+        ) : null}
       </div>
     </div>
   );

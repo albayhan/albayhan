@@ -1,6 +1,6 @@
 "use client";
 import { useActionState, useEffect, useRef, useState } from "react";
-import { addInstrumentAction, addMetricAction, addTxAction, importCsvAction, runReportAction, type FormState } from "@/app/actions";
+import { addAlertAction, addInstrumentAction, addMetricAction, addTxAction, importCsvAction, runReportAction, type FormState } from "@/app/actions";
 
 function Result({ state }: { state: FormState }) {
   if (state.error) {
@@ -129,6 +129,23 @@ export function MetricForm({ symbol }: { symbol: string }) {
       <input className="input" name="source_url" placeholder="Kaynak bağlantısı (https://…)" aria-label="Kaynak bağlantısı" />
       <button className="btn-ghost" disabled={pending}>Ekle</button>
       <div className="col-span-2 sm:col-span-5"><Result state={state} /></div>
+    </form>
+  );
+}
+
+export function AlertForm({ symbol, price }: { symbol: string; price: number | null }) {
+  const [state, action, pending] = useActionState(addAlertAction, {});
+  return (
+    <form action={action} className="grid grid-cols-2 gap-2 sm:grid-cols-[1fr_1fr_2fr_auto]">
+      <input type="hidden" name="symbol" value={symbol} />
+      <select name="op" className="input" aria-label="Koşul" defaultValue="above">
+        <option value="above">Fiyat üstüne çıkarsa (≥)</option>
+        <option value="below">Fiyat altına inerse (≤)</option>
+      </select>
+      <input className="input" name="price" inputMode="decimal" placeholder={price ? `Örn. ${price.toLocaleString("tr-TR", { minimumFractionDigits: 2 })}` : "Fiyat"} aria-label="Alarm fiyatı" />
+      <input className="input col-span-2 sm:col-span-1" name="note" placeholder="Not (isteğe bağlı, ör. zarar-kes)" aria-label="Not" />
+      <button className="btn col-span-2 sm:col-span-1" disabled={pending}>Alarm kur</button>
+      <div className="col-span-2 sm:col-span-4"><Result state={state} /></div>
     </form>
   );
 }

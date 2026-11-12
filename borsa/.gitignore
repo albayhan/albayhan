@@ -7,3 +7,5 @@ backups
 .sandbox-ca.crt
 Dockerfile.sandbox
 tests/e2e-out
+baslat.log
+sunucu.log

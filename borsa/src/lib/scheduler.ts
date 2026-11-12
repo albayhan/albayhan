@@ -2,6 +2,8 @@ import cron from "node-cron";
 import { migrate } from "./db";
 import { backfillFx, listInstruments, refreshCatalog, refreshFx, refreshQuote } from "./data";
 import { generateDailyReport } from "./report";
+import { getLastScan, runScan, scanIsOld } from "./scan";
+import { checkAlerts } from "./alerts";
 import { inSession, istClock, isWeekday, TZ } from "./time";
 
 const g = globalThis as unknown as { __scheduler?: boolean };
@@ -30,7 +32,13 @@ export function startScheduler() {
   cron.schedule("*/5 10-18 * * 1-5", async () => {
     if (!inSession()) return;
     for (const i of await listInstruments("in_watchlist OR type='index'")) await refreshQuote(i);
+    const fired = await checkAlerts();
+    for (const a of fired) log(`alarm tetiklendi: ${a.symbol} ${a.op === "above" ? ">=" : "<="} ${a.price} (fiyat ${a.triggeredPrice})`);
   }, { timezone: TZ });
+  // Sinyal taraması: seans içinde 30 dakikada bir, kapanıştan sonra bir kez
+  const scan = async () => { const r = await runScan(); if (r) log(`tarama: ${r.rows.length} hisse, ${r.breadth.buy} AL, ${r.breadth.sell} SAT/AZALT (${Math.round(r.durationMs / 1000)} sn)`); };
+  cron.schedule("20,50 10-17 * * 1-5", () => { void scan(); }, { timezone: TZ });
+  cron.schedule("50 18 * * 1-5", () => { void scan(); }, { timezone: TZ });
   cron.schedule("15 16 * * 1-5", () => { void refreshFx(true); }, { timezone: TZ }); // TCMB bülteni 15:30'da yayımlanır
 
   // Açılış: şema, katalog, kurlar; rapor saati geçtiyse ya da önceki günün raporu eksikse telafi
@@ -42,6 +50,7 @@ export function startScheduler() {
       const c = istClock();
       if (!isWeekday() || c.minutes >= 18 * 60 + 40 || c.minutes < 10 * 60) await report("telafi");
       else log("seans sürüyor; günlük özet 18:40'ta üretilecek");
+      if (scanIsOld(await getLastScan())) void scan();
     } catch (e: any) {
       log(`açılış hatası: ${e?.message ?? e}`);
     }

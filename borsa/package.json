@@ -11,12 +11,12 @@
   },
   "dependencies": {
     "lightweight-charts": "4.2.3",
-    "next": "15.5.4",
+    "next": "15.5.29",
     "node-cron": "3.0.3",
     "pg": "8.13.1",
-    "react": "19.1.0",
-    "react-dom": "19.1.0",
-    "undici": "6.21.0"
+    "react": "19.1.10",
+    "react-dom": "19.1.10",
+    "undici": "6.29.1"
   },
   "devDependencies": {
     "@types/node": "22.10.2",

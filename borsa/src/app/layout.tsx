@@ -3,15 +3,17 @@ import type { Metadata, Viewport } from "next";
 import Link from "next/link";
 import Nav from "@/components/Nav";
 import { providerStatuses } from "@/lib/data";
+import { listAlerts } from "@/lib/alerts";
 
 export const metadata: Metadata = { title: "BIST Portföy", description: "Türkiye borsası için portföy, analiz ve günlük özet" };
 export const viewport: Viewport = { width: "device-width", initialScale: 1 };
 export const dynamic = "force-dynamic";
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  let down = 0;
+  let down = 0, fired = 0;
   try {
     down = (await providerStatuses()).filter((s) => !s.ok).length;
+    fired = (await listAlerts()).filter((a) => a.triggeredAt && !a.seen).length;
   } catch {
     down = -1;
   }
@@ -22,7 +24,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           <div className="mx-auto flex h-14 max-w-6xl items-center gap-4 px-4">
             <Link href="/" className="text-base font-bold tracking-tight">BIST Portföy</Link>
             <div className="hidden flex-1 md:block"><Nav variant="top" /></div>
-            <Link href="/durum" className="ml-auto flex items-center gap-2 rounded-full border border-slate-200 px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-100" title="Veri kaynakları ve bağlantı durumu">
+            {fired > 0 ? <Link href="/sinyaller#alarmlar-tetiklenen" className="ml-auto rounded-full bg-amber-100 px-3 py-1.5 text-xs font-semibold text-amber-900">🔔 {fired} alarm</Link> : null}
+            <Link href="/durum" className={`${fired > 0 ? "" : "ml-auto "} flex items-center gap-2 rounded-full border border-slate-200 px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-100`} title="Veri kaynakları ve bağlantı durumu">
               <span className={`h-2 w-2 rounded-full ${down === 0 ? "bg-up" : down < 0 ? "bg-down" : "bg-amber-500"}`} />
               {down === 0 ? "Veri bağlantıları çalışıyor" : down < 0 ? "Veritabanına ulaşılamıyor" : `${down} veri kaynağında sorun`}
             </Link>

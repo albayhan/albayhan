@@ -177,3 +177,37 @@ export async function addMetricAction(_prev: FormState, fd: FormData): Promise<F
   revalidatePath("/", "layout");
   return { ok: "Kaydedildi." };
 }
+
+// ---------- Tarama ve alarmlar ----------
+
+export async function runScanAction() {
+  const { runScan } = await import("@/lib/scan");
+  void runScan();
+  await new Promise((r) => setTimeout(r, 300));
+  revalidatePath("/sinyaller");
+  redirect("/sinyaller");
+}
+
+export async function addAlertAction(_prev: FormState, fd: FormData): Promise<FormState> {
+  const { addAlert } = await import("@/lib/alerts");
+  const symbol = String(fd.get("symbol") ?? "").trim().toUpperCase();
+  const op = String(fd.get("op")) === "below" ? "below" : "above";
+  const raw = String(fd.get("price") ?? "").trim();
+  const price = raw ? parseTrNumber(raw) : NaN;
+  if (!symbol || !(price > 0)) return { error: "Geçerli bir fiyat girin." };
+  await addAlert({ symbol, op, price, note: String(fd.get("note") ?? "").trim().slice(0, 120) });
+  revalidatePath("/", "layout");
+  return { ok: `Alarm kuruldu: ${symbol} ${op === "above" ? "≥" : "≤"} ${price.toLocaleString("tr-TR", { minimumFractionDigits: 2 })} ₺` };
+}
+
+export async function removeAlertAction(fd: FormData) {
+  const { removeAlert } = await import("@/lib/alerts");
+  await removeAlert(String(fd.get("id")));
+  revalidatePath("/", "layout");
+}
+
+export async function markAlertsSeenAction() {
+  const { markAlertsSeen } = await import("@/lib/alerts");
+  await markAlertsSeen();
+  revalidatePath("/", "layout");
+}

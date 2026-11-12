@@ -39,7 +39,7 @@ async function peerRows(symbol: string): Promise<PeerRow[]> {
   );
 }
 
-export async function analyzeInstrument(inst: Instrument, ctx: { settings: Settings; portfolio: Portfolio; deep?: boolean; force?: boolean }): Promise<Analyzed> {
+export async function analyzeInstrument(inst: Instrument, ctx: { settings: Settings; portfolio: Portfolio; deep?: boolean; force?: boolean; peers?: boolean }): Promise<Analyzed> {
   const refresh = await refreshSymbol(inst, { deep: ctx.deep !== false, force: ctx.force });
   const [quote, rawBars, disclosures, st] = await Promise.all([
     getQuote(inst.symbol), getBars(inst.symbol), getDisclosures(inst.symbol),
@@ -55,7 +55,7 @@ export async function analyzeInstrument(inst: Instrument, ctx: { settings: Setti
   if (inst.type === "stock") {
     const metrics = computeMetrics(st.statements, quote?.market_cap ?? null);
     company = await companyView(inst.symbol, disclosures, metrics);
-    const peers = ctx.deep !== false ? await peerRows(inst.symbol) : [];
+    const peers = ctx.deep !== false && ctx.peers !== false ? await peerRows(inst.symbol) : [];
     long = analyzeLong({ metrics, price: quote?.price ?? null, peers, settings: ctx.settings, extraChangers: company?.changers });
     if (company && long.ok) {
       long.reasons.push(...company.notes);

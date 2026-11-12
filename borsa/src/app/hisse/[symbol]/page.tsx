@@ -5,12 +5,18 @@ import { analyzeInstrument } from "@/lib/engine";
 import { getPortfolio } from "@/lib/portfolio-data";
 import { getSettings } from "@/lib/settings";
 import { recommendationHistory } from "@/lib/report";
-import { sma } from "@/lib/indicators";
+import { macd as macdCalc, rsi as rsiCalc, sma } from "@/lib/indicators";
+import { backtestShort } from "@/lib/backtest";
+import { toAction } from "@/lib/scan";
+import { listAlerts } from "@/lib/alerts";
+import IndicatorChart from "@/components/IndicatorChart";
+import { ColumnBars, Meter } from "@/components/charts";
+import { removeAlertAction } from "@/app/actions";
 import { kapLink } from "@/lib/providers/kap";
 import { fmtCompact, fmtDate, fmtDateTime, fmtNum, fmtPct } from "@/lib/format";
-import PriceChart, { type Candle } from "@/components/PriceChart";
-import { KindBadge, Notice, QuoteStamp, Stamp, StatusBadge, tone } from "@/components/ui";
-import { MetricForm } from "@/components/forms";
+import PriceChart, { type Candle, type Marker } from "@/components/PriceChart";
+import { ActionBadge, KindBadge, Notice, QuoteStamp, Stamp, StatusBadge, tone } from "@/components/ui";
+import { AlertForm, MetricForm } from "@/components/forms";
 
 export const dynamic = "force-dynamic";
 
@@ -19,7 +25,8 @@ export default async function Hisse({ params }: { params: Promise<{ symbol: stri
   const inst = await getInstrument(symbol);
   if (!inst || inst.type !== "stock") notFound();
   const [settings, portfolio] = await Promise.all([getSettings(), getPortfolio()]);
-  const [a, history] = await Promise.all([analyzeInstrument(inst, { settings, portfolio, deep: true }), recommendationHistory(symbol)]);
+  const [a, history, alerts] = await Promise.all([analyzeInstrument(inst, { settings, portfolio, deep: true }), recommendationHistory(symbol), listAlerts()]);
+  const myAlerts = alerts.filter((x) => x.symbol === symbol);
   const { quote, bars, short: s, long: l, decision: d } = a;
   const chg = quote?.prev_close ? (quote.price / quote.prev_close - 1) * 100 : null;
 
@@ -35,6 +42,23 @@ export default async function Hisse({ params }: { params: Promise<{ symbol: stri
     ...s.resistances.slice(0, 2).map((x) => ({ price: x.price, title: "Direnç", color: "#b91c1c" })),
   ];
   const noOpen = bars.filter((b) => b.open === null).length;
+  const action = toAction(a);
+  const bt = backtestShort(bars, settings);
+  const markers: Marker[] = bt.ok ? bt.trades.flatMap((t) => [
+    { time: t.entryDate, kind: "buy" as const, text: "AL" },
+    ...(t.exit !== "açık" ? [{ time: t.exitDate, kind: "sell" as const, text: `${t.exit === "hedef" ? "Hedef" : t.exit === "zarar-kes" ? "Stop" : "Süre"} ${t.retPct > 0 ? "+" : ""}${t.retPct.toFixed(1)}%` }] : []),
+  ]) : [];
+  const rsiArr = rsiCalc(closes, 14), mc = macdCalc(closes);
+  const pts = (arr: (number | null)[]) => arr.map((v, i) => (v === null ? null : { time: bars[i].date, value: v })).filter((x): x is { time: string; value: number } => !!x);
+  const checks = s.ok ? [
+    { ok: s.price > s.ind.sma20!, t: `Fiyat 20 günlük ortalamanın üstünde (${fmtNum(s.ind.sma20)})` },
+    { ok: s.ind.sma20! > s.ind.sma50!, t: `20 günlük ort. 50 günlüğün üstünde (${fmtNum(s.ind.sma50)})` },
+    ...(s.ind.sma200 !== null ? [{ ok: s.price > s.ind.sma200, t: `Fiyat 200 günlük ortalamanın üstünde (${fmtNum(s.ind.sma200)})` }] : []),
+    { ok: s.ind.rsi === null || s.ind.rsi < 75, t: `RSI 75'in altında (${fmtNum(s.ind.rsi, 1)})` },
+    { ok: (s.ind.macdHist ?? 0) > 0, t: "MACD sinyal çizgisinin üstünde" },
+    { ok: (s.ind.volRatio ?? 0) >= 1, t: `Hacim ortalamanın üstünde (${fmtNum(s.ind.volRatio)}×)` },
+    { ok: s.rr! >= s.minRR, t: `Risk/ödül en az ${fmtNum(s.minRR, 1)} (${fmtNum(s.rr)})` },
+  ] : [];
   const m = l?.metrics;
   const material = a.disclosures.filter(isMaterial).slice(0, 12);
 
@@ -44,7 +68,7 @@ export default async function Hisse({ params }: { params: Promise<{ symbol: stri
         <Link href="/izleme" className="text-sm text-slate-500 underline">← İzleme Listesi</Link>
         <div className="mt-1 flex flex-wrap items-start justify-between gap-3">
           <div><h1 className="text-xl font-bold tracking-tight">{symbol}</h1><p className="text-sm text-slate-500">{inst.name}</p></div>
-          <StatusBadge status={d.status} />
+          <div className="flex flex-col items-end gap-1"><ActionBadge action={action} size="lg" /><StatusBadge status={d.status} /></div>
         </div>
         <div className="mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1">
           <span className="text-3xl font-semibold tracking-tight" data-testid="price">{quote ? fmtNum(quote.price) : "—"} <span className="text-lg">₺</span></span>
@@ -67,11 +91,80 @@ export default async function Hisse({ params }: { params: Promise<{ symbol: stri
         {a.position ? <p className="mt-2 text-xs text-slate-500">Pozisyonunuz: {fmtNum(a.position.qty, 0)} adet · ortalama maliyet {fmtNum(a.position.avgCost)} · K/Z {fmtPct(a.position.plPct)} · ağırlık %{fmtNum(a.position.weightPct, 1)}</p> : null}
       </section>
 
+      {s.ok ? (
+        <section className="card" aria-label="Sinyal kontrol listesi">
+          <h2 className="h-sec">Sinyal kontrol listesi <span className="ml-1 text-sm font-normal text-slate-500">— {checks.filter((c) => c.ok).length}/{checks.length} koşul olumlu</span></h2>
+          <div className="mt-3 grid gap-4 md:grid-cols-[1fr_260px]">
+            <ul className="grid gap-1.5 text-sm sm:grid-cols-2">
+              {checks.map((c) => <li key={c.t} className="flex items-start gap-2"><span className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-white ${c.ok ? "bg-up" : "bg-down"}`}>{c.ok ? "✓" : "✕"}</span>{c.t}</li>)}
+            </ul>
+            <div className="space-y-4">
+              <div><p className="mb-1 flex justify-between text-xs text-slate-500"><span>Teknik puan</span><b className={tone(s.score)}>{s.score > 0 ? "+" : ""}{s.score}</b></p>
+                <Meter value={s.score} min={-85} max={85} zones={[{ to: -30, color: "#fecaca" }, { to: 20, color: "#e2e8f0" }, { to: 85, color: "#bbf7d0" }]} label="Teknik puan" />
+                <p className="mt-1.5 flex justify-between text-[10px] text-slate-400"><span>Zayıf</span><span>Nötr</span><span>Güçlü</span></p></div>
+              <div><p className="mb-1 flex justify-between text-xs text-slate-500"><span>RSI (14)</span><b className="text-slate-800">{fmtNum(s.ind.rsi, 1)}</b></p>
+                <Meter value={s.ind.rsi} zones={[{ to: 30, color: "#bbf7d0" }, { to: 70, color: "#e2e8f0" }, { to: 100, color: "#fecaca" }]} label="RSI" />
+                <p className="mt-1.5 flex justify-between text-[10px] text-slate-400"><span>Aşırı satım</span><span>Aşırı alım</span></p></div>
+            </div>
+          </div>
+        </section>
+      ) : null}
+
       <section className="card">
         <h2 className="h-sec mb-3">Fiyat grafiği</h2>
-        {candles.length ? <PriceChart candles={candles} overlays={overlays} levels={levels} volumeUnit={bars[0]?.source === "EODHD" ? "adet" : "₺"} /> : <p className="text-sm text-slate-600">Grafik için tarihsel veri yok.</p>}
+        {candles.length ? <PriceChart candles={candles} overlays={overlays} levels={levels} markers={markers} volumeUnit={bars[0]?.source === "EODHD" ? "adet" : "₺"} /> : <p className="text-sm text-slate-600">Grafik için tarihsel veri yok.</p>}
         <Stamp className="mt-2" source={`${bars[bars.length - 1]?.source ?? "—"} (temettü ve bölünmeye göre düzeltilmiş günlük seri)`} dataAt={bars[bars.length - 1]?.date} dateOnly fetchedAt={quote?.fetched_at} />
         {noOpen > 0 ? <p className="mt-1 text-[11px] text-slate-500">Bu kaynağın günlük serisinde açılış fiyatı yoktur: {noOpen} günde mum yalnızca en yüksek–en düşük aralığı ve kapanışı gösterir (gövde çizilmez). Açılış, fiyat kaydından alınabildiği günlerde eklenir; tam mum için anahtarlı sağlayıcı (EODHD) bağlanabilir.</p> : null}
+      </section>
+
+      {closes.length > 60 ? (
+        <section className="card">
+          <h2 className="h-sec mb-3">Göstergeler — RSI ve MACD</h2>
+          <IndicatorChart rsi={pts(rsiArr)} macd={pts(mc.line)} signal={pts(mc.signal)} hist={pts(mc.hist)} />
+        </section>
+      ) : null}
+
+      <section className="card" aria-label="Geçmiş test">
+        <h2 className="h-sec">Geçmiş test — bu kural geçmişte ne yaptı?</h2>
+        {!bt.ok ? <p className="mt-2 text-sm text-slate-600">{bt.note}</p> : (
+          <>
+            <p className="mt-1 text-xs text-slate-500">{fmtDate(bt.from)} – {fmtDate(bt.to)} · kısa vade AL sinyali · en fazla {bt.maxHoldDays} işlem günü tutma · risk profili ve vade ayarlarınızla</p>
+            <div className="mt-3 grid grid-cols-2 gap-2 text-sm sm:grid-cols-5">
+              <div className="rounded-xl bg-slate-50 p-3"><p className="text-xs text-slate-500">İşlem</p><p className="font-semibold">{bt.closed}{bt.trades.length > bt.closed ? <span className="text-xs font-normal text-slate-500"> +1 açık</span> : null}</p></div>
+              <div className="rounded-xl bg-slate-50 p-3"><p className="text-xs text-slate-500">İsabet</p><p className="font-semibold">{bt.winRatePct !== null ? `%${fmtNum(bt.winRatePct, 0)}` : "—"}</p></div>
+              <div className="rounded-xl bg-slate-50 p-3"><p className="text-xs text-slate-500">Ort. işlem getirisi</p><p className={`font-semibold ${tone(bt.avgRetPct)}`}>{fmtPct(bt.avgRetPct, 1)}</p></div>
+              <div className="rounded-xl bg-slate-50 p-3"><p className="text-xs text-slate-500">Strateji toplam</p><p className={`font-semibold ${tone(bt.totalRetPct)}`}>{fmtPct(bt.totalRetPct, 1)}</p></div>
+              <div className="rounded-xl bg-slate-50 p-3"><p className="text-xs text-slate-500">Al-tut (aynı dönem)</p><p className={`font-semibold ${tone(bt.buyHoldPct)}`}>{fmtPct(bt.buyHoldPct, 1)}</p></div>
+            </div>
+            {bt.trades.length ? (
+              <>
+                <div className="mt-3"><ColumnBars values={bt.trades.map((t) => t.retPct)} labels={bt.trades.map((t) => fmtDate(t.entryDate))} /></div>
+                <div className="mt-2 overflow-x-auto">
+                  <table className="w-full min-w-[560px] text-sm">
+                    <thead><tr className="border-b border-slate-100"><th className="th !pl-0">Giriş</th><th className="th text-right">Fiyat</th><th className="th">Çıkış</th><th className="th text-right">Fiyat</th><th className="th">Neden</th><th className="th text-right">Gün</th><th className="th !pr-0 text-right">Getiri</th></tr></thead>
+                    <tbody className="divide-y divide-slate-100">{[...bt.trades].reverse().slice(0, 12).map((t) => (
+                      <tr key={t.entryDate}><td className="td !pl-0">{fmtDate(t.entryDate)}</td><td className="td text-right">{fmtNum(t.entryPrice)}</td><td className="td">{t.exit === "açık" ? "—" : fmtDate(t.exitDate)}</td><td className="td text-right">{fmtNum(t.exitPrice)}</td>
+                        <td className="td"><span className={`rounded px-1.5 py-0.5 text-[11px] font-medium ${t.exit === "hedef" ? "bg-emerald-50 text-emerald-800" : t.exit === "zarar-kes" ? "bg-red-50 text-red-800" : "bg-slate-100 text-slate-600"}`}>{t.exit === "açık" ? "açık pozisyon" : t.exit}</span></td>
+                        <td className="td text-right">{t.days}</td><td className={`td !pr-0 text-right font-medium ${tone(t.retPct)}`}>{fmtPct(t.retPct, 1)}</td></tr>))}</tbody>
+                  </table>
+                </div>
+              </>
+            ) : <p className="mt-3 text-sm text-slate-600">Bu dönemde kuralın tüm koşulları hiç sağlanmadı; AL sinyali oluşmadı.</p>}
+            <p className="mt-2 text-[11px] text-slate-500">{bt.note} Al/sat işaretleri fiyat grafiğinde de gösterilir.</p>
+          </>
+        )}
+      </section>
+
+      <section className="card" aria-label="Fiyat alarmı">
+        <h2 className="h-sec">🔔 Fiyat alarmı</h2>
+        {myAlerts.length ? <ul className="mt-2 space-y-1 text-sm">{myAlerts.map((x) => (
+          <li key={x.id} className="flex flex-wrap items-center gap-2">
+            <span>{x.op === "above" ? "≥" : "≤"} <b>{fmtNum(x.price)} ₺</b>{x.note ? <span className="text-slate-500"> · {x.note}</span> : null}</span>
+            {x.triggeredAt ? <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-medium text-amber-800">Tetiklendi {fmtDateTime(x.triggeredAt)}</span> : <span className="text-xs text-slate-500">bekliyor</span>}
+            <form action={removeAlertAction}><input type="hidden" name="id" value={x.id} /><button className="text-xs text-slate-500 underline">Sil</button></form>
+          </li>))}</ul> : null}
+        {s.ok && s.stop && s.target ? <p className="mt-2 text-xs text-slate-500">Öneri: zarar-kes {fmtNum(s.stop)} ₺ için “altına inerse”, hedef {fmtNum(s.target)} ₺ için “üstüne çıkarsa” alarmı.</p> : null}
+        <div className="mt-3"><AlertForm symbol={symbol} price={quote?.price ?? null} /></div>
       </section>
 
       {s.ok ? (
