@@ -1,0 +1,43 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: borsa
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-borsa}
+      POSTGRES_DB: borsa
+      TZ: Europe/Istanbul
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U borsa -d borsa"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "${APP_PORT:-3000}:3000"
+    environment:
+      DATABASE_URL: postgres://borsa:${POSTGRES_PASSWORD:-borsa}@db:5432/borsa
+      TZ: Europe/Istanbul
+      PRICE_PROVIDER: ${PRICE_PROVIDER:-isyatirim}
+      EODHD_API_KEY: ${EODHD_API_KEY:-}
+      EVDS_API_KEY: ${EVDS_API_KEY:-}
+      EVDS_BASE_URL: ${EVDS_BASE_URL:-}
+      TEFAS_BASE_URL: ${TEFAS_BASE_URL:-}
+      CRON_SECRET: ${CRON_SECRET:-}
+      SIMULATE_OUTAGE: ${SIMULATE_OUTAGE:-}
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pgdata:
